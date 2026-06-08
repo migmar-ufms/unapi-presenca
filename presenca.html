@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UnAPI — Presença</title>
 <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
-<style>
+<style>a
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -632,16 +632,8 @@ async function enviarPresenca(id) {
   console.log('📤 Enviando ID:', id);
 
   try {
-    const payload = { id };
-    console.log('📨 Payload:', JSON.stringify(payload));
-    
-    const res = await fetch(url, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' },
-      mode: 'cors'
-    });
-    
+    const res = await fetch(url + '?id=' + encodeURIComponent(id));
+
     console.log('📥 Status HTTP:', res.status);
     const dados = await res.json();
     console.log('📥 Resposta:', dados);
