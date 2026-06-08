@@ -391,8 +391,9 @@
   </div>
 
   <div class="participantes-lista" id="lista-qr"></div>
-  <button class="btn-imprimir" onclick="abrirImpressaoCrachas()">🖨️ Imprimir Crachás 6x9</button>
-  <button class="btn-imprimir" onclick="window.print()" style="background: var(--verde-medio); margin-top: 0.5rem;">📄 Imprimir Lista QR</button>
+  <button class="btn-imprimir" onclick="exportarCodigosQR()">📥 Baixar QR Codes (PNG)</button>
+  <button class="btn-imprimir" onclick="exportarListaCodigos()" style="background: var(--verde-medio); margin-top: 0.5rem;">📄 Baixar Códigos (TXT)</button>
+  <button class="btn-imprimir" onclick="exportarListaNomes()" style="background: #7c5a8f; margin-top: 0.5rem;">📋 Baixar Nomes (TXT)</button>
 </div>
 
 <script>
@@ -707,34 +708,98 @@ function trocarAba(aba, btn) {
   btn.classList.add('ativo');
 }
 
-// ─── IMPRESSÃO DE CRACHÁS ──────────────────────────────────────
-function abrirImpressaoCrachas() {
-  let htmlCrachas = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Crachás - UnAPI Presença</title><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { background: #f0f0f0; padding: 10mm; font-family: "DM Sans", Arial, sans-serif; } .pagina-crachas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10mm; margin-bottom: 20mm; } .cracha { width: 152.4mm; height: 228.6mm; background: white; border: 2px solid #ddd; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 15mm; page-break-inside: avoid; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } .cracha-nome { font-size: 18px; font-weight: 600; color: #1a1a1a; text-align: center; margin-bottom: 20mm; max-width: 100%; word-wrap: break-word; min-height: 50px; display: flex; align-items: center; justify-content: center; } .cracha-qr { width: 100px; height: 100px; margin: 15mm 0; border: 3px solid #6b46c1; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: white; } .cracha-qr img { width: 94px; height: 94px; } .cracha-codigo { font-family: "Courier New", monospace; font-size: 12px; font-weight: bold; color: #6b46c1; text-align: center; margin-top: 10mm; letter-spacing: 1px; } .cracha-logo { font-size: 10px; color: #999; margin-top: auto; text-align: center; } @media print { body { background: white; padding: 0; } .pagina-crachas { gap: 0; margin-bottom: 0; } .cracha { box-shadow: none; border: none; } }</style></head><body>';
+// ─── EXPORTAÇÃO DE DADOS ──────────────────────────────────────
+function baixarArquivoTexto(conteudo, nomeArquivo) {
+  // Tenta primeiro usando data: URI em nova aba (funciona em arquivo local)
+  const dataUri = 'data:text/plain;charset=utf-8,' + encodeURIComponent(conteudo);
+  const novaAba = window.open(dataUri, '_blank');
+  
+  // Se a nova aba falhar, tenta criar um blob e fazer download
+  if (!novaAba) {
+    try {
+      const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nomeArquivo;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch(e) {
+      console.error('Erro ao baixar:', e);
+    }
+  }
+}
+
+function exportarCodigosQR() {
+  mostrarResultado(null, 'Preparando download dos QR Codes...', null);
+  let downloadados = 0;
+  let erros = 0;
   
   participantes.forEach((nome, index) => {
     const id = gerarId(nome);
-    const qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=' + encodeURIComponent(id) + '&color=6b46c1&bgcolor=ffffff';
+    const nomeArquivo = id + '_' + nome.replace(/[^a-zA-Z0-9]/g, '_') + '.png';
+    const qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(id) + '&color=1a5c3a&bgcolor=ffffff';
     
-    if (index % 2 === 0) {
-      htmlCrachas += '<div class="pagina-crachas">';
-    }
-    
-    htmlCrachas += '<div class="cracha"><div class="cracha-nome">' + nome + '</div><div class="cracha-qr"><img src="' + qrImageUrl + '" alt="QR Code ' + id + '"></div><div class="cracha-codigo">' + id + '</div><div class="cracha-logo">UnAPI</div></div>';
-    
-    if (index % 2 === 1 || index === participantes.length - 1) {
-      htmlCrachas += '</div>';
-    }
+    setTimeout(() => {
+      fetch(qrImageUrl)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = nomeArquivo;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 100);
+          
+          downloadados++;
+          if (downloadados + erros === participantes.length) {
+            if (erros === 0) {
+              mostrarResultado(true, 'Todos os ' + participantes.length + ' QR Codes baixados!', new Date().toLocaleTimeString());
+            } else {
+              mostrarResultado(true, downloadados + ' QR Codes, ' + erros + ' erros', new Date().toLocaleTimeString());
+            }
+          }
+        })
+        .catch(err => {
+          console.error('❌ Erro ao baixar:', err);
+          erros++;
+          if (downloadados + erros === participantes.length) {
+            mostrarResultado(false, 'Erro ao baixar alguns QR Codes', null);
+          }
+        });
+    }, index * 200);
+  });
+}
+
+function exportarListaCodigos() {
+  let conteudo = 'LISTA DE CÓDIGOS QR - UnAPI Presença\n';
+  conteudo += '='.repeat(50) + '\n\n';
+  
+  participantes.forEach((nome) => {
+    const id = gerarId(nome);
+    conteudo += id + '\n';
   });
   
-  htmlCrachas += '</body></html>';
+  baixarArquivoTexto(conteudo, 'codigos_qr.txt');
+  mostrarResultado(true, 'Códigos abertos em nova aba!', new Date().toLocaleTimeString());
+}
+
+function exportarListaNomes() {
+  let conteudo = 'LISTA DE NOMES - UnAPI Presença\n';
+  conteudo += '='.repeat(50) + '\n\n';
   
-  const janela = window.open();
-  janela.document.write(htmlCrachas);
-  janela.document.close();
+  participantes.forEach((nome, index) => {
+    conteudo += (index + 1) + '. ' + nome + '\n';
+  });
   
-  setTimeout(() => {
-    janela.print();
-  }, 500);
+  baixarArquivoTexto(conteudo, 'lista_nomes.txt');
+  mostrarResultado(true, 'Nomes abertos em nova aba!', new Date().toLocaleTimeString());
 }
 
 // ─── INIT ─────────────────────────────────────────────────────
