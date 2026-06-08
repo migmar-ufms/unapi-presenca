@@ -498,6 +498,8 @@ let stream = null;
 let qrDetectado = null;
 let congelado = false;
 let tempoRestante = 3;
+let ultimoCodigoLido = '';
+let ultimoLeitura = 0;
 
 async function iniciarCamera() {
   try {
@@ -547,12 +549,24 @@ function lerFrame() {
     try {
       const qr = jsQR(imageData.data, imageData.width, imageData.height);
       
-      if (qr && qr.data.startsWith('UNAPI-') && !congelado) {
-        console.log('🔍 QR detectado:', qr.data);
-        console.log('✅ QR válido encontrado:', qr.data);
-        
-        // Congelar câmera e mostrar overlay
-        congelarCamera(qr.data);
+      if (qr && qr.data) {
+        const codigo = qr.data.trim();
+        const agora = Date.now();
+
+        if (
+          codigo === ultimoCodigoLido &&
+          agora - ultimoLeitura < 3000
+        ) {
+          requestAnimationFrame(lerFrame);
+          return;
+        }
+
+        ultimoCodigoLido = codigo;
+        ultimoLeitura = agora;
+
+        document.getElementById('id-manual').value = codigo;
+        enviarPresenca(codigo);
+        pararCamera();
         return;
       }
     } catch (e) {
@@ -633,7 +647,7 @@ async function enviarPresenca(id) {
 
   try {
     const res = await fetch(url + '?id=' + encodeURIComponent(id));
-
+    
     console.log('📥 Status HTTP:', res.status);
     const dados = await res.json();
     console.log('📥 Resposta:', dados);
