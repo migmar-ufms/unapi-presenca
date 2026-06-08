@@ -365,6 +365,12 @@
 
   <button class="btn-camera" id="btn-iniciar" onclick="iniciarCamera()">Iniciar câmera</button>
 
+  <div class="url-input-wrap" style="margin-top: 1.25rem;">
+    <label>Ou cole manualmente o ID do QR Code</label>
+    <input type="text" id="id-manual" placeholder="UNAPI-XXXXXX" />
+    <button class="btn-camera" onclick="enviarPresencaManual()" style="margin-top: 0.5rem; background: var(--verde-medio);">Registrar presença</button>
+  </div>
+
   <div class="resultado" id="resultado"></div>
 </div>
 
@@ -478,6 +484,7 @@ let stream = null;
 
 async function iniciarCamera() {
   try {
+    console.log('📹 Iniciando câmera...');
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
     });
@@ -486,9 +493,12 @@ async function iniciarCamera() {
     document.getElementById('btn-iniciar').textContent = '⏹ Parar câmera';
     document.getElementById('btn-iniciar').onclick = pararCamera;
     lendo = true;
+    console.log('✅ Câmera ativada');
+    mostrarResultado(null, '📷 Câmera iniciada - aponte para o QR Code');
     lerFrame();
   } catch (e) {
-    mostrarResultado(false, 'Não foi possível acessar a câmera. Verifique as permissões.');
+    console.error('Erro ao acessar câmera:', e);
+    mostrarResultado(false, 'Câmera não disponível: ' + e.name + '. Use o campo manual abaixo.');
   }
 }
 
@@ -510,12 +520,23 @@ function lerFrame() {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const qr = jsQR(imageData.data, imageData.width, imageData.height);
-
-    if (qr && qr.data.startsWith('UNAPI-')) {
-      pararCamera();
-      enviarPresenca(qr.data);
-      return;
+    
+    try {
+      const qr = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (qr) {
+        console.log('🔍 QR detectado:', qr.data);
+        if (qr.data.startsWith('UNAPI-')) {
+          console.log('✅ QR válido encontrado:', qr.data);
+          pararCamera();
+          enviarPresenca(qr.data);
+          return;
+        } else {
+          console.log('⚠️ QR lido mas não é UNAPI:', qr.data);
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao processar QR:', e);
     }
   }
   requestAnimationFrame(lerFrame);
@@ -526,18 +547,27 @@ async function enviarPresenca(id) {
   const url = document.getElementById('url-script').value.trim();
   if (!url) {
     mostrarResultado(false, 'Configure a URL do Apps Script primeiro.');
+    console.error('URL do Apps Script não configurada');
     return;
   }
 
   mostrarResultado(null, 'Registrando presença...');
+  console.log('📤 Enviando ID:', id);
 
   try {
+    const payload = { id };
+    console.log('📨 Payload:', JSON.stringify(payload));
+    
     const res = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify({ id }),
-      headers: { 'Content-Type': 'application/json' }
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors'
     });
+    
+    console.log('📥 Status HTTP:', res.status);
     const dados = await res.json();
+    console.log('📥 Resposta:', dados);
 
     if (dados.sucesso) {
       mostrarResultado(true, dados.nome, dados.hora);
@@ -545,34 +575,52 @@ async function enviarPresenca(id) {
       mostrarResultado(false, dados.mensagem || 'QR Code não reconhecido.');
     }
   } catch (e) {
-    mostrarResultado(false, 'Erro de conexão. Verifique a URL e a internet.');
+    console.error('❌ Erro de conexão:', e);
+    mostrarResultado(false, 'Erro: ' + e.message + '. Verifique a URL e a internet.');
   }
 }
 
 function mostrarResultado(sucesso, msg, hora) {
   const el = document.getElementById('resultado');
+  el.style.display = 'block';
   el.className = 'resultado';
 
   if (sucesso === true) {
     el.classList.add('sucesso');
     el.innerHTML = `<div class="nome">✅ ${msg}</div><div class="hora">Presença registrada às ${hora}</div>`;
+    console.log('✅ Sucesso:', msg, hora);
   } else if (sucesso === false) {
     el.classList.add('erro');
-    el.textContent = '❌ ' + msg;
+    el.innerHTML = `❌ ${msg}`;
+    console.error('❌ Erro:', msg);
   } else {
-    el.style.display = 'block';
+    el.classList.add('erro');
     el.style.background = '#f0f4f8';
-    el.style.border = '1px solid #c8d8cf';
+    el.style.borderColor = '#c8d8cf';
     el.style.color = '#5a6672';
-    el.textContent = msg;
+    el.innerHTML = msg;
+    console.log('⏳ Status:', msg);
   }
 
   if (sucesso !== null) {
     setTimeout(() => {
+      el.style.display = 'none';
       el.className = 'resultado';
-      el.style = '';
+      el.style.background = '';
+      el.style.borderColor = '';
+      el.style.color = '';
     }, 4000);
   }
+}
+
+function enviarPresencaManual() {
+  const id = document.getElementById('id-manual').value.trim().toUpperCase();
+  if (!id || !id.startsWith('UNAPI-')) {
+    mostrarResultado(false, 'ID inválido. Digite no formato UNAPI-XXXXXX');
+    return;
+  }
+  enviarPresenca(id);
+  document.getElementById('id-manual').value = '';
 }
 
 // ─── ABAS ─────────────────────────────────────────────────────
