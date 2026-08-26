@@ -1,3 +1,17 @@
+function salvarUrlScript() {
+  const url = document.getElementById('url-script').value.trim();
+  if (url) {
+    localStorage.setItem('urlScriptUnapi', url);
+  }
+}
+
+function carregarUrlScript() {
+  const urlSalva = localStorage.getItem('urlScriptUnapi');
+  if (urlSalva) {
+    document.getElementById('url-script').value = urlSalva;
+  }
+}
+
 // ─── DADOS DOS PARTICIPANTES ─────────────────────────────────
 // Adicione ou remova participantes aqui
 const participantes = [
@@ -101,6 +115,11 @@ let congelado = false;
 let tempoRestante = 3;
 let ultimoCodigoLido = '';
 let ultimoLeitura = 0;
+const CONFIG_QR = {
+  larguraMaxima: 640,
+  alturaMaxima: 480,
+  intervaloMinimo: 180
+};
 
 async function iniciarCamera() {
   if (typeof jsQR === 'undefined') {
@@ -116,7 +135,11 @@ async function iniciarCamera() {
   try {
     console.log('📹 Iniciando câmera...');
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: {
+        facingMode: 'environment',
+        width: { ideal: CONFIG_QR.larguraMaxima },
+        height: { ideal: CONFIG_QR.alturaMaxima }
+      }
     });
     const video = document.getElementById('video');
     video.srcObject = stream;
@@ -163,28 +186,49 @@ function pararCamera() {
 }
 
 function lerFrame() {
-  if (!lendo) return;
+  if (!lendo || congelado) return;
+
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas-hidden');
   const ctx = canvas.getContext('2d');
+  const agora = Date.now();
+
+  if (agora - ultimoLeitura < CONFIG_QR.intervaloMinimo) {
+    requestAnimationFrame(lerFrame);
+    return;
+  }
 
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const larguraOriginal = video.videoWidth || 640;
+    const alturaOriginal = video.videoHeight || 480;
+    let novaLargura = larguraOriginal;
+    let novaAltura = alturaOriginal;
+
+    if (novaLargura > CONFIG_QR.larguraMaxima) {
+      const proporcao = CONFIG_QR.larguraMaxima / novaLargura;
+      novaLargura = CONFIG_QR.larguraMaxima;
+      novaAltura = Math.max(1, Math.round(alturaOriginal * proporcao));
+    }
+
+    if (novaAltura > CONFIG_QR.alturaMaxima) {
+      const proporcao = CONFIG_QR.alturaMaxima / novaAltura;
+      novaAltura = CONFIG_QR.alturaMaxima;
+      novaLargura = Math.max(1, Math.round(novaLargura * proporcao));
+    }
+
+    canvas.width = novaLargura;
+    canvas.height = novaAltura;
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
+
     try {
       const qr = jsQR(imageData.data, imageData.width, imageData.height);
-      
+
       if (qr && qr.data) {
         const codigo = qr.data.trim();
-        const agora = Date.now();
 
-        if (
-          codigo === ultimoCodigoLido &&
-          agora - ultimoLeitura < 3000
-        ) {
+        if (codigo === ultimoCodigoLido && agora - ultimoLeitura < 3000) {
           requestAnimationFrame(lerFrame);
           return;
         }
@@ -201,10 +245,8 @@ function lerFrame() {
       console.error('Erro ao processar QR:', e);
     }
   }
-  
-  if (!congelado) {
-    requestAnimationFrame(lerFrame);
-  }
+
+  requestAnimationFrame(lerFrame);
 }
 
 function congelarCamera(id) {
@@ -274,6 +316,7 @@ async function enviarPresenca(id) {
   console.log('📤 Enviando ID:', id);
 
   try {
+    salvarUrlScript();
     const res = await fetch(url + '?id=' + encodeURIComponent(id));
     
     console.log('📥 Status HTTP:', res.status);
@@ -438,5 +481,8 @@ function exportarListaNomes() {
   mostrarResultado(true, 'Nomes abertos em nova aba!', new Date().toLocaleTimeString());
 }
 
+document.getElementById('url-script').addEventListener('input', salvarUrlScript);
+
 // ─── INIT ─────────────────────────────────────────────────────
+carregarUrlScript();
 renderizarQRCodes();
