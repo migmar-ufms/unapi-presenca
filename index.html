@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UnAPI — Presença</title>
+<link rel="stylesheet" href="style.css">
+<!-- jsQR carregado localmente (não depende de CDN externo, que pode ser bloqueado por algumas redes móveis) -->
+<script src="jsQR.js"></script>
+</head>
+<body>
+
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <rect width="28" height="28" rx="6" fill="rgba(255,255,255,0.15)"/>
+    <path d="M7 14a7 7 0 0 1 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="14" cy="14" r="2.5" fill="white"/>
+    <path d="M14 7v2M14 19v2M7 14H5M23 14h-2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+  <div>
+    <h1>UnAPI — Controle de Presença</h1>
+    <p>Leitura de QR Code</p>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab ativo" onclick="trocarAba('leitor', this)">📷 Leitor</button>
+  <button class="tab" onclick="trocarAba('gerador', this)">🖨️ Gerar QR Codes</button>
+</div>
+
+<!-- LEITOR -->
+<div class="pagina ativa" id="pagina-leitor">
+
+  <div class="caminho-config">
+    <span>⚠️</span>
+    <div>
+      <strong>Configure a URL do Apps Script abaixo antes de usar</strong>
+      Copie a URL gerada ao implantar o script no Google Apps Script e cole no campo abaixo.
+    </div>
+  </div>
+
+  <div class="url-input-wrap">
+    <label>URL do Google Apps Script</label>
+    <input type="url" id="url-script" placeholder="https://script.google.com/macros/s/..." />
+  </div>
+
+  <div id="area-camera">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas-hidden"></canvas>
+    <canvas id="canvas-congelado" style="position: absolute; inset: 0; display: none;"></canvas>
+    <div class="mira"><div class="mira-quadro"></div></div>
+    <div id="overlay-captura" style="position: absolute; inset: 0; background: rgba(26, 92, 58, 0.3); display: none; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: bold;">
+      <div>✅ QR Code Detectado!</div>
+      <div id="tempo-restante" style="font-size: 2rem; margin-top: 10px;">3</div>
+    </div>
+  </div>
+
+  <button class="btn-camera" id="btn-iniciar" onclick="iniciarCamera()">Iniciar câmera</button>
+  <button class="btn-camera" id="btn-confirmar" onclick="confirmarLeitura()" style="display: none; background: var(--verde-medio); margin-top: 0.5rem;">✓ Confirmar Leitura</button>
+
+  <div class="url-input-wrap" style="margin-top: 1.25rem;">
+    <label>Ou cole manualmente o ID do QR Code</label>
+    <input type="text" id="id-manual" placeholder="UNAPI-XXXXXX" />
+    <button class="btn-camera" onclick="enviarPresencaManual()" style="margin-top: 0.5rem; background: var(--verde-medio);">Registrar presença</button>
+  </div>
+
+  <div class="resultado" id="resultado"></div>
+</div>
+
+<!-- GERADOR -->
+<div class="pagina" id="pagina-gerador">
+
+  <div class="instrucoes-planilha">
+    <div class="passo"><div class="num">1</div><div>Abra a planilha e vá em <strong>Extensões → Apps Script</strong></div></div>
+    <div class="passo"><div class="num">2</div><div>Cole o código do arquivo <strong>apps_script.gs</strong> e salve</div></div>
+    <div class="passo"><div class="num">3</div><div>Clique em <strong>Implantar → Nova implantação → App da Web</strong>. Acesso: <em>Qualquer pessoa</em></div></div>
+    <div class="passo"><div class="num">4</div><div>Copie a URL gerada e cole no campo da aba <strong>Leitor</strong></div></div>
+    <div class="passo"><div class="num">5</div><div>Adicione uma <strong>coluna D</strong> na planilha chamada <em>ID_QR</em> e cole os IDs abaixo em cada linha correspondente</div></div>
+  </div>
+
+  <div class="participantes-lista" id="lista-qr"></div>
+  <button class="btn-imprimir" onclick="exportarCodigosQR()">📥 Baixar QR Codes (PNG)</button>
+  <button class="btn-imprimir" onclick="exportarListaCodigos()" style="background: var(--verde-medio); margin-top: 0.5rem;">📄 Baixar Códigos (TXT)</button>
+  <button class="btn-imprimir" onclick="exportarListaNomes()" style="background: #7c5a8f; margin-top: 0.5rem;">📋 Baixar Nomes (TXT)</button>
+</div>
+
+
+<script src="script.js"></script>
+</body>
+</html>
