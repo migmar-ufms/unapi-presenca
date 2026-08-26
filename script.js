@@ -281,7 +281,9 @@ async function enviarPresenca(id) {
     console.log('📥 Resposta:', dados);
 
     if (dados.sucesso) {
+      const mensagemConfirmacao = `✅ Dados enviados para a planilha com sucesso!${dados.nome ? `\nParticipante: ${dados.nome}` : ''}${dados.hora ? `\nHora: ${dados.hora}` : ''}`;
       mostrarResultado(true, dados.nome, dados.hora);
+      alert(mensagemConfirmacao);
     } else {
       mostrarResultado(false, dados.mensagem || 'QR Code não reconhecido.');
     }
